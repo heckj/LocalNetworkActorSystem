@@ -7,3 +7,8 @@ DerivedData/
 .swiftpm/config/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
+.symbol-graphs
+Sources/LocalNetworkActorSystem/Documentation.docc/.docc-build
+all_identifiers.txt
+all_symbols.txt
+docs

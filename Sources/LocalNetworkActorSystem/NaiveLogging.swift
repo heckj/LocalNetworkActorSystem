@@ -2,7 +2,7 @@
 
 import Foundation
 
-public func debug(_ category: String, _ message: String, file: String = #fileID, line: Int = #line, function: String = #function) {
+public func debug(_: String, _: String, file _: String = #fileID, line _: Int = #line, function _: String = #function) {
     // ignore
 }
 

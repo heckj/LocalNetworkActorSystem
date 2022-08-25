@@ -1,6 +1,5 @@
 // A wrapper around Network Framework browser, simplifying discovering new services.
 
-
 import Foundation
 import Network
 
@@ -18,7 +17,7 @@ final class Browser {
     }
 
     func start(handler: @escaping (NWBrowser.Result) -> Void) {
-        browser.browseResultsChangedHandler = { results, changes in
+        browser.browseResultsChangedHandler = { results, _ in
             for result in results {
                 if case NWEndpoint.service(let nodeName, type: _, domain: _, interface: _) = result.endpoint {
                     log("browser", "incoming endpoint, nodeName: \(nodeName) (self.nodeName: \(self.nodeName))")

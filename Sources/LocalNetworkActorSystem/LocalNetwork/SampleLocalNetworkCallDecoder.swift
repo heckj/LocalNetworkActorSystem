@@ -1,9 +1,9 @@
 // Decoder type that is used to decode remote calls.
 
-import Foundation
 import Distributed
-import os
+import Foundation
 import Network
+import os
 
 @available(iOS 16.0, macOS 13.0, *)
 public class SampleLocalNetworkCallDecoder: DistributedTargetInvocationDecoder {
@@ -15,20 +15,20 @@ public class SampleLocalNetworkCallDecoder: DistributedTargetInvocationDecoder {
 
     init(system: SampleLocalNetworkActorSystem, envelope: RemoteCallEnvelope) {
         self.envelope = envelope
-        self.argumentsIterator = envelope.args.makeIterator()
+        argumentsIterator = envelope.args.makeIterator()
 
         let decoder = JSONDecoder()
         decoder.userInfo[.actorSystemKey] = system
         self.decoder = decoder
     }
 
-    public  func decodeGenericSubstitutions() throws -> [Any.Type] {
+    public func decodeGenericSubstitutions() throws -> [Any.Type] {
         envelope.genericSubs.compactMap { name in
             _typeByName(name)
         }
     }
 
-    public  func decodeNextArgument<Argument: Codable>() throws -> Argument {
+    public func decodeNextArgument<Argument: Codable>() throws -> Argument {
         guard let data = argumentsIterator.next() else {
             throw SampleLocalNetworkActorSystemError.notEnoughArgumentsInEnvelope(expected: Argument.self)
         }

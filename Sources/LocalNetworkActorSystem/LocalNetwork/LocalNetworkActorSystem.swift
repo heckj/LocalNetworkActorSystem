@@ -1,15 +1,14 @@
 // Actor system which enables distributed actors to communicate over local network, e.g. on the same Wi-Fi network.
 
-
-import Foundation
 import Distributed
-import os
+import Foundation
 import Network
+import os
 
 @available(iOS 16.0, macOS 13.0, *)
-final public class SampleLocalNetworkActorSystem: DistributedActorSystem,
-    @unchecked /* state protected with locks */ Sendable {
-
+public final class SampleLocalNetworkActorSystem: DistributedActorSystem,
+    @unchecked /* state protected with locks */ Sendable
+{
     public typealias ActorID = ActorIdentity
     public typealias InvocationEncoder = SampleLocalNetworkCallEncoder
     public typealias InvocationDecoder = SampleLocalNetworkCallDecoder
@@ -37,39 +36,38 @@ final public class SampleLocalNetworkActorSystem: DistributedActorSystem,
     var _onPeersChanged: ([Peer]) -> Void = { _ in }
 
     public var receptionist: LocalNetworkReceptionist {
-        self._receptionist!
+        _receptionist!
     }
 
     public init() {
-        let nodeID = Int.random(in: 0..<Int.max)
+        let nodeID = Int.random(in: 0 ..< Int.max)
         let nodeName = "peer_\(nodeID)"
         self.nodeName = nodeName
 
-        self.nwListener = try! Self.makeNWListener(nodeName: nodeName, serviceName: serviceName)
-        self.browser = Browser(nodeName: nodeName, serviceName: serviceName)
+        nwListener = try! Self.makeNWListener(nodeName: nodeName, serviceName: serviceName)
+        browser = Browser(nodeName: nodeName, serviceName: serviceName)
 
-        self.peers = []
+        peers = []
 
         // Initialize "system actors"
-        self._receptionist = LocalNetworkReceptionist(actorSystem: self)
+        _receptionist = LocalNetworkReceptionist(actorSystem: self)
 
-        self.startNetworking()
+        startNetworking()
     }
 
-    private static func makeNWListener(nodeName: String, serviceName: String) throws -> NWListener {
-
-        return try NWListener(using: NetworkServiceConstants.networkParameters)
+    private static func makeNWListener(nodeName _: String, serviceName _: String) throws -> NWListener {
+        try NWListener(using: NetworkServiceConstants.networkParameters)
     }
 
     /// Start the server-side component accepting incoming connections.
     private func startNetworking() {
         // === Kick off the NWListener
         let txtRecord = NWTXTRecord([
-            NetworkServiceConstants.txtRecordInstanceIDKey: self.nodeName
+            NetworkServiceConstants.txtRecordInstanceIDKey: nodeName,
         ])
 
         // The name is the unique thing, identifying a node in the peer to peer network
-        nwListener.service = NWListener.Service(name: self.nodeName, type: self.serviceName, txtRecord: txtRecord)
+        nwListener.service = NWListener.Service(name: nodeName, type: serviceName, txtRecord: txtRecord)
 
         nwListener.newConnectionHandler = { (connection: NWConnection) in
             let con = Connection(connection: connection, deliverMessage: { data, nwMessage in
@@ -111,13 +109,13 @@ final public class SampleLocalNetworkActorSystem: DistributedActorSystem,
         }
     }
 
-    private func addPeer(connection: Connection, from: String) -> Peer? {
+    private func addPeer(connection: Connection, from _: String) -> Peer? {
         // Peer management should be vastly improved if we needed this sample to
         // extend into a production ready application. We must be able to tell peers
         // coming in from the same "node" on different connections, and only use one
         // of them for communication.
 
-        if case NWEndpoint.service(let endpointName, _, _, _) = connection.connection.endpoint {
+        if case let NWEndpoint.service(endpointName, _, _, _) = connection.connection.endpoint {
             if self.nodeName == endpointName {
                 return nil
             }
@@ -128,15 +126,15 @@ final public class SampleLocalNetworkActorSystem: DistributedActorSystem,
         }
 
         let peer = Peer(connection: connection)
-        self.peers.append(peer)
+        peers.append(peer)
 
-        self._onPeersChanged(self.peers)
+        _onPeersChanged(peers)
 
         return peer
     }
 
     /// Receive inbound message `Data` and continue to decode, and invoke the local target.
-    func decodeAndDeliver(data: Data?, nwMessage: NWProtocolFramer.Message, from connection: NWConnection) {
+    func decodeAndDeliver(data: Data?, nwMessage: NWProtocolFramer.Message, from _: NWConnection) {
         // log("receive-decode-deliver", "On connection [\(connection)]")
         guard let payload = data else {
             // log("receive-decode-deliver", "[error] On connection [\(connection)], no payload!")
@@ -153,10 +151,10 @@ final public class SampleLocalNetworkActorSystem: DistributedActorSystem,
                 log("receive-decode-deliver", "[error] Unknown message type! Data: \(payload))")
             case .remoteCall:
                 let callEnvelope = try decoder.decode(RemoteCallEnvelope.self, from: payload)
-                self.receiveInboundCall(envelope: callEnvelope)
+                receiveInboundCall(envelope: callEnvelope)
             case .reply:
                 let replyEnvelope = try decoder.decode(ReplyEnvelope.self, from: payload)
-                self.receiveInboundReply(envelope: replyEnvelope)
+                receiveInboundReply(envelope: replyEnvelope)
             }
         } catch {
             log("receive-decode-deliver",
@@ -180,7 +178,8 @@ final public class SampleLocalNetworkActorSystem: DistributedActorSystem,
                         on: recipient,
                         target: target,
                         invocationDecoder: &decoder,
-                        handler: handler)
+                        handler: handler
+                    )
                 }
 
                 // As implicit opening of existential becomes part of the language,
@@ -197,89 +196,89 @@ final public class SampleLocalNetworkActorSystem: DistributedActorSystem,
 
     func receiveInboundReply(envelope: ReplyEnvelope) {
         log("receive-reply", "Receive reply: \(envelope)")
-        self.replyLock.lock()
-        guard let callContinuation = self.inFlightCalls.removeValue(forKey: envelope.callID) else {
-            self.replyLock.unlock()
+        replyLock.lock()
+        guard let callContinuation = inFlightCalls.removeValue(forKey: envelope.callID) else {
+            replyLock.unlock()
             return
         }
-        self.replyLock.unlock()
+        replyLock.unlock()
 
         callContinuation.resume(returning: envelope.value)
     }
 
     func resolveAny(id: ActorID, resolveReceptionist: Bool = false) -> (any DistributedActor)? {
-self.lock.lock()
-defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
 
-if resolveReceptionist && id == ActorID(id: "receptionist") {
-    return self.receptionist
-}
+        if resolveReceptionist, id == ActorID(id: "receptionist") {
+            return receptionist
+        }
 
-return managedActors[id]
-}
-
-public func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
-    where Act: DistributedActor,
-    Act.ID == ActorID {
-    self.lock.lock()
-    defer {
-        lock.unlock()
+        return managedActors[id]
     }
 
-    if actorType == LocalNetworkReceptionist.self {
-        return nil
+    public func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+        where Act: DistributedActor,
+        Act.ID == ActorID
+    {
+        lock.lock()
+        defer {
+            lock.unlock()
+        }
+
+        if actorType == LocalNetworkReceptionist.self {
+            return nil
+        }
+
+        guard let found = managedActors[id] else {
+            return nil // definitely remote, we don't know about this ActorID
+        }
+
+        guard let wellTyped = found as? Act else {
+            throw SampleLocalNetworkActorSystemError.resolveFailedToMatchActorType(found: type(of: found), expected: Act.self)
+        }
+
+        return wellTyped
     }
 
-    guard let found = managedActors[id] else {
-        return nil // definitely remote, we don't know about this ActorID
+    public func assignID<Act>(_: Act.Type) -> ActorID
+        where Act: DistributedActor,
+        Act.ID == ActorID
+    {
+        if Act.self == LocalNetworkReceptionist.self {
+            return .init(id: "receptionist")
+        }
+
+        let uuid = UUID().uuidString
+        let typeFullName = "\(Act.self)"
+        guard typeFullName.split(separator: ".").last != nil else {
+            return .init(id: uuid)
+        }
+
+        return .init(id: "\(uuid)")
     }
 
-    guard let wellTyped = found as? Act else {
-        throw SampleLocalNetworkActorSystemError.resolveFailedToMatchActorType(found: type(of: found), expected: Act.self)
+    public func actorReady<Act>(_ actor: Act) where Act: DistributedActor, ActorID == Act.ID {
+        lock.lock()
+        defer {
+            self.lock.unlock()
+        }
+
+        managedActors[actor.id] = actor
     }
 
-    return wellTyped
-}
+    public func resignID(_ id: ActorID) {
+        lock.lock()
+        defer {
+            lock.unlock()
+        }
 
-public func assignID<Act>(_ actorType: Act.Type) -> ActorID
-    where Act: DistributedActor,
-    Act.ID == ActorID {
-
-    if Act.self == LocalNetworkReceptionist.self {
-        return .init(id: "receptionist")
+        managedActors.removeValue(forKey: id)
     }
 
-    let uuid = UUID().uuidString
-    let typeFullName = "\(Act.self)"
-    guard typeFullName.split(separator: ".").last != nil else {
-        return .init(id: uuid)
+    public func makeInvocationEncoder() -> InvocationEncoder {
+        .init()
     }
-
-    return .init(id: "\(uuid)")
-}
-
-public func actorReady<Act>(_ actor: Act) where Act: DistributedActor, ActorID == Act.ID {
-    self.lock.lock()
-    defer {
-        self.lock.unlock()
-    }
-
-    self.managedActors[actor.id] = actor
-}
-
-public func resignID(_ id: ActorID) {
-    lock.lock()
-    defer {
-        lock.unlock()
-    }
-
-    self.managedActors.removeValue(forKey: id)
-}
-
-public func makeInvocationEncoder() -> InvocationEncoder {
-    .init()
-}
-
 }
 
 // ==== ----------------------------------------------------------------------------------------------------------------
@@ -287,25 +286,25 @@ public func makeInvocationEncoder() -> InvocationEncoder {
 
 @available(iOS 16.0, *)
 extension SampleLocalNetworkActorSystem {
-
     public func remoteCall<Act, Err, Res>(
         on actor: Act,
         target: RemoteCallTarget,
         invocation: inout InvocationEncoder,
-        throwing: Err.Type,
-        returning: Res.Type
+        throwing _: Err.Type,
+        returning _: Res.Type
     ) async throws -> Res
         where Act: DistributedActor,
         Act.ID == ActorID,
         Err: Error,
-        Res: Codable {
+        Res: Codable
+    {
         log("remoteCall", "remoteCall [\(target)] on remote \(actor.id)")
-        self.lock.lock()
+        lock.lock()
 
         guard !peers.isEmpty else {
             log("remoteCall", "No peers")
 
-            self.lock.unlock()
+            lock.unlock()
             throw SampleLocalNetworkActorSystemError.noPeers
         }
 
@@ -337,18 +336,19 @@ extension SampleLocalNetworkActorSystem {
         on actor: Act,
         target: RemoteCallTarget,
         invocation: inout InvocationEncoder,
-        throwing: Err.Type
+        throwing _: Err.Type
     ) async throws
         where Act: DistributedActor,
         Act.ID == ActorID,
-        Err: Error {
+        Err: Error
+    {
         log("system", "remoteCallVoid [\(target)] on remote \(actor.id)")
-        self.lock.lock()
+        lock.lock()
 
         guard !peers.isEmpty else {
             log("remoteCall", "No peers")
             // throw SampleLocalNetworkActorSystemError.noPeers
-            self.lock.unlock()
+            lock.unlock()
             return
         }
 
@@ -372,7 +372,8 @@ extension SampleLocalNetworkActorSystem {
         target: RemoteCallTarget,
         invocation: InvocationEncoder,
         callID: CallID,
-        peer: Peer) where Act: DistributedActor, Act.ID == ActorID {
+        peer: Peer
+    ) where Act: DistributedActor, Act.ID == ActorID {
         Task {
             let encoder = JSONEncoder()
 
@@ -392,8 +393,9 @@ extension SampleLocalNetworkActorSystem {
         }
     }
 
-    private func withCallIDContinuation<Act>(recipient: Act, body: (CallID) -> Void) async throws -> Data
-        where Act: DistributedActor {
+    private func withCallIDContinuation<Act>(recipient _: Act, body: (CallID) -> Void) async throws -> Data
+        where Act: DistributedActor
+    {
         try await withCheckedThrowingContinuation { continuation in
             self.replyLock.lock()
             defer {
@@ -412,7 +414,7 @@ extension SampleLocalNetworkActorSystem {
 @available(iOS 16.0, *)
 extension SampleLocalNetworkActorSystem {
     func sendReply(_ envelope: ReplyEnvelope) throws {
-        self.lock.lock()
+        lock.lock()
         defer {
             self.lock.unlock()
         }
@@ -423,7 +425,7 @@ extension SampleLocalNetworkActorSystem {
         // A more advanced implementation would pick the right connection rather than
         // send to all peers. For this sample app this is enough though, since we
         // assume two peers.
-        for peer in self.peers {
+        for peer in peers {
             print("reply", "Sending reply for [\(envelope.callID)] on \(peer.connection.connection)")
             peer.connection.sendReply(data)
         }
@@ -435,21 +437,21 @@ extension SampleLocalNetworkActorSystem {
 
 @available(iOS 16.0, *)
 extension SampleLocalNetworkActorSystem {
-    func selectPeer(for id: ActorID) -> Peer? {
+    func selectPeer(for _: ActorID) -> Peer? {
         // Naive implementation; would normally need to maintain an ID -> Peer mapping.
-        self.peers.first
+        peers.first
     }
 }
 
 @available(iOS 16.0, *)
 extension SampleLocalNetworkActorSystem {
     func onPeersChanged(_ callback: @escaping @Sendable ([Peer]) -> Void) {
-        self.lock.lock()
+        lock.lock()
         defer {
             self.lock.unlock()
         }
 
-        self._onPeersChanged = callback
+        _onPeersChanged = callback
     }
 }
 
@@ -468,12 +470,12 @@ public struct BonjourResultHandler: Distributed.DistributedTargetInvocationResul
     public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
         let encoder = JSONEncoder()
         let returnValue = try encoder.encode(value)
-        let envelope = ReplyEnvelope(callID: self.callID, sender: nil, value: returnValue)
+        let envelope = ReplyEnvelope(callID: callID, sender: nil, value: returnValue)
         try system.sendReply(envelope)
     }
 
     public func onReturnVoid() async throws {
-        let envelope = ReplyEnvelope(callID: self.callID, sender: nil, value: "".data(using: .utf8)!)
+        let envelope = ReplyEnvelope(callID: callID, sender: nil, value: "".data(using: .utf8)!)
         try system.sendReply(envelope)
     }
 
