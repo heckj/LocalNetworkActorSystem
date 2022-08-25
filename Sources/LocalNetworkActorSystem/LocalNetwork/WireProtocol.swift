@@ -10,12 +10,13 @@ enum WireMessageType: UInt32 {
     case reply = 2
 }
 
-/// Custom wire protocol framer for our distributed actor take on the "tic tac toe" game.
+/// Custom wire protocol framer for our local network distributed actor.
 ///
-/// Note that thanks to the Framer abstraction we're able to reuse it across the Bonjour as well as Internet transport implementations.
+/// Thanks to the Framer abstraction we're able to reuse it with Bonjour as well as Internet transport implementations.
 ///
-/// To learn more about building custom network protocols with NSProtocolFramer, please refer to the
-/// "Advances in Networking, Part 2" session from WWDC 2019: https://developer.apple.com/videos/play/wwdc2019/713/
+/// To learn more about building custom network protocols with [`NSProtocolFramer`](https://developer.apple.com/documentation/network/nwprotocolframer), please refer to the
+/// [Advances in Networking, Part 2](https://developer.apple.com/videos/play/wwdc2019/713/)
+/// session from WWDC 2019.
 final class WireProtocol: NWProtocolFramerImplementation {
     // Create a global definition of your game protocol to add to connections.
     static let definition = NWProtocolFramer.Definition(implementation: WireProtocol.self)

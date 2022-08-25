@@ -79,7 +79,7 @@ public final class SampleLocalNetworkActorSystem: DistributedActorSystem,
         }
         nwListener.start(queue: .main)
 
-        // Kick of the browser for discovery
+        // Kick off the browser for discovery
         browser.start { result in
             self.lock.lock()
             defer {
@@ -284,7 +284,7 @@ public final class SampleLocalNetworkActorSystem: DistributedActorSystem,
 // ==== ----------------------------------------------------------------------------------------------------------------
 // - MARK: RemoteCall implementations
 
-@available(iOS 16.0, *)
+@available(iOS 16.0, macOS 13.0, *)
 extension SampleLocalNetworkActorSystem {
     public func remoteCall<Act, Err, Res>(
         on actor: Act,
@@ -411,7 +411,7 @@ extension SampleLocalNetworkActorSystem {
 // ==== ----------------------------------------------------------------------------------------------------------------
 // - MARK: Reply handling
 
-@available(iOS 16.0, *)
+@available(iOS 16.0, macOS 13.0, *)
 extension SampleLocalNetworkActorSystem {
     func sendReply(_ envelope: ReplyEnvelope) throws {
         lock.lock()
@@ -435,7 +435,7 @@ extension SampleLocalNetworkActorSystem {
 // ==== ----------------------------------------------------------------------------------------------------------------
 // - MARK: Other
 
-@available(iOS 16.0, *)
+@available(iOS 16.0, macOS 13.0, *)
 extension SampleLocalNetworkActorSystem {
     func selectPeer(for _: ActorID) -> Peer? {
         // Naive implementation; would normally need to maintain an ID -> Peer mapping.
@@ -443,7 +443,7 @@ extension SampleLocalNetworkActorSystem {
     }
 }
 
-@available(iOS 16.0, *)
+@available(iOS 16.0, macOS 13.0, *)
 extension SampleLocalNetworkActorSystem {
     func onPeersChanged(_ callback: @escaping @Sendable ([Peer]) -> Void) {
         lock.lock()
@@ -455,12 +455,12 @@ extension SampleLocalNetworkActorSystem {
     }
 }
 
-@available(iOS 16.0, *)
+@available(iOS 16.0, macOS 13.0, *)
 extension Logger {
     static let server = os.Logger(subsystem: "com.example.apple.swift.distributed", category: "server")
 }
 
-@available(iOS 16.0, *)
+@available(iOS 16.0, macOS 13.0, *)
 public struct BonjourResultHandler: Distributed.DistributedTargetInvocationResultHandler {
     public typealias SerializationRequirement = Codable
 
@@ -514,12 +514,12 @@ enum NetworkServiceConstants {
     }
 }
 
-@available(iOS 16.0, *)
+@available(iOS 16.0, macOS 13.0, *)
 struct Peer: Sendable {
     let connection: Connection
 }
 
-@available(iOS 16.0, *)
+@available(iOS 16.0, macOS 13.0, *)
 struct RemoteCallEnvelope: Sendable, Codable {
     let callID: SampleLocalNetworkActorSystem.CallID
     let recipient: SampleLocalNetworkActorSystem.ActorID
@@ -528,7 +528,7 @@ struct RemoteCallEnvelope: Sendable, Codable {
     let args: [Data]
 }
 
-@available(iOS 16.0, *)
+@available(iOS 16.0, macOS 13.0, *)
 struct ReplyEnvelope: Sendable, Codable {
     let callID: SampleLocalNetworkActorSystem.CallID
     let sender: SampleLocalNetworkActorSystem.ActorID?
