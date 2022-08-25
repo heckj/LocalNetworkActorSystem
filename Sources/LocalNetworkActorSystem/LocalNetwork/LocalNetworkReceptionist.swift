@@ -56,7 +56,7 @@ public distributed actor LocalNetworkReceptionist: DistributedActorReceptionist 
                 try await remoteReceptionist.inform(about: actor, tag: tag)
                 log("receptionist", "DONE INFORMING ABOUT \(actor.id)")
 
-                Thread.sleep(forTimeInterval: 1)
+                try await Task.sleep(until: .now + .seconds(1), clock: .continuous)
             }
         }
     }
