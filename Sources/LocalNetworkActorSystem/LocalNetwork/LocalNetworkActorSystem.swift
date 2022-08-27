@@ -18,7 +18,8 @@ public final class SampleLocalNetworkActorSystem: DistributedActorSystem,
     let nodeName: String
     let serviceName: String = "_tictacfish._tcp"
 
-    private let lock = NSLock()
+    // Internal semaphore for locking to protect state during actor calls
+    private let lock = DispatchSemaphore(value: 1)
 
     private var managedActors: [ActorID: any DistributedActor] = [:]
 
@@ -28,6 +29,7 @@ public final class SampleLocalNetworkActorSystem: DistributedActorSystem,
     var peers: [Peer]
     private var _receptionist: LocalNetworkReceptionist!
 
+    
     // === Handle replies
     public typealias CallID = UUID
     private let replyLock = NSLock()
@@ -81,9 +83,9 @@ public final class SampleLocalNetworkActorSystem: DistributedActorSystem,
 
         // Kick off the browser for discovery
         browser.start { result in
-            self.lock.lock()
+            self.lock.wait()
             defer {
-                self.lock.unlock()
+                self.lock.signal()
             }
 
             // -----
@@ -207,8 +209,8 @@ public final class SampleLocalNetworkActorSystem: DistributedActorSystem,
     }
 
     func resolveAny(id: ActorID, resolveReceptionist: Bool = false) -> (any DistributedActor)? {
-        lock.lock()
-        defer { lock.unlock() }
+        lock.wait()
+        defer { lock.signal() }
 
         if resolveReceptionist, id == ActorID(id: "receptionist") {
             return receptionist
@@ -221,9 +223,9 @@ public final class SampleLocalNetworkActorSystem: DistributedActorSystem,
         where Act: DistributedActor,
         Act.ID == ActorID
     {
-        lock.lock()
+        lock.wait()
         defer {
-            lock.unlock()
+            lock.signal()
         }
 
         if actorType == LocalNetworkReceptionist.self {
@@ -259,18 +261,18 @@ public final class SampleLocalNetworkActorSystem: DistributedActorSystem,
     }
 
     public func actorReady<Act>(_ actor: Act) where Act: DistributedActor, ActorID == Act.ID {
-        lock.lock()
+        lock.wait()
         defer {
-            self.lock.unlock()
+            self.lock.signal()
         }
 
         managedActors[actor.id] = actor
     }
 
     public func resignID(_ id: ActorID) {
-        lock.lock()
+        lock.wait()
         defer {
-            lock.unlock()
+            lock.signal()
         }
 
         managedActors.removeValue(forKey: id)
@@ -299,12 +301,22 @@ extension SampleLocalNetworkActorSystem {
         Res: Codable
     {
         log("remoteCall", "remoteCall [\(target)] on remote \(actor.id)")
-        lock.lock()
+        
+        // Discussion about the warning:
+        //   Instance method 'lock' is unavailable from asynchronous contexts;
+        //   Use async-safe scoped locking instead; this is an error in Swift 6
+        // for the lock.lock() and lock.unlock() just below.
+        // https://forums.swift.org/t/pitch-unavailability-from-asynchronous-contexts/53877
+        lock.wait()
 
+        // after switching to a DispatchSemaphore, it's reporting:
+        //   Instance method 'wait' is unavailable from asynchronous contexts;
+        //   Await a Task handle instead; this is an error in Swift 6
+        
         guard !peers.isEmpty else {
             log("remoteCall", "No peers")
 
-            lock.unlock()
+            lock.signal()
             throw SampleLocalNetworkActorSystemError.noPeers
         }
 
@@ -319,7 +331,7 @@ extension SampleLocalNetworkActorSystem {
             for peer in self.peers {
                 self.sendRemoteCall(to: actor, target: target, invocation: invocation, callID: callID, peer: peer)
             }
-            self.lock.unlock()
+            self.lock.signal()
         }
 
         let decoder = JSONDecoder()
@@ -342,13 +354,15 @@ extension SampleLocalNetworkActorSystem {
         Act.ID == ActorID,
         Err: Error
     {
+        
         log("system", "remoteCallVoid [\(target)] on remote \(actor.id)")
-        lock.lock()
+        lock.wait()
 
         guard !peers.isEmpty else {
             log("remoteCall", "No peers")
+            
+            lock.signal()
             // throw SampleLocalNetworkActorSystemError.noPeers
-            lock.unlock()
             return
         }
 
@@ -363,7 +377,7 @@ extension SampleLocalNetworkActorSystem {
             for peer in self.peers {
                 self.sendRemoteCall(to: actor, target: target, invocation: invocation, callID: callID, peer: peer)
             }
-            self.lock.unlock()
+            self.lock.signal()
         }
     }
 
@@ -414,9 +428,9 @@ extension SampleLocalNetworkActorSystem {
 @available(iOS 16.0, macOS 13.0, *)
 extension SampleLocalNetworkActorSystem {
     func sendReply(_ envelope: ReplyEnvelope) throws {
-        lock.lock()
+        lock.wait()
         defer {
-            self.lock.unlock()
+            self.lock.signal()
         }
 
         let encoder = JSONEncoder()
@@ -446,9 +460,9 @@ extension SampleLocalNetworkActorSystem {
 @available(iOS 16.0, macOS 13.0, *)
 extension SampleLocalNetworkActorSystem {
     func onPeersChanged(_ callback: @escaping @Sendable ([Peer]) -> Void) {
-        lock.lock()
+        lock.wait()
         defer {
-            self.lock.unlock()
+            self.lock.signal()
         }
 
         _onPeersChanged = callback
